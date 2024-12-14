@@ -1,0 +1,56 @@
+name: Preview QR
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: "The working directory to run the command in"
+        required: false
+        default: "."
+        type: string
+    secrets:
+      EXPO_TOKEN:
+        required: true
+
+jobs:
+  update:
+    name: EAS Update
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: development
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "You must provide an EXPO_TOKEN secret linked to this project's Expo account in this repo's secrets. Learn more: https://docs.expo.dev/eas-update/github-actions"
+            exit 1
+          fi
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: yarn
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Create preview
+        uses: nderscore/expo-github-action/preview@workaround # TODO: replace original when issue fixes: https://github.com/expo/expo-github-action/issues/221
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          command: eas update --branch development --message "${{ github.event.pull_request.title }}" --clear-cache
